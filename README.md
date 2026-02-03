@@ -27,6 +27,64 @@ Runtime scripts: `build_runtime_mac_mps.sh`, `build_runtime_mac_intel.sh`
 
 Model files are **not** committed. See `MODEL_DOWNLOADS.md` for URLs and download notes.
 
+## Worker Protocol (audiosep)
+
+Worker starts in persistent mode:
+
+```bash
+./dist/dsu-audiosep/dsu-audiosep --worker
+```
+
+Send one JSON command per line via stdin. Responses are JSON on stdout.
+
+### Commands
+
+**1) load_model**
+
+```json
+{
+  "cmd": "load_model",
+  "config_path": "/abs/path/config/audiosep_base.yaml",
+  "checkpoint_path": "/abs/path/checkpoint/audiosep_base_4M_steps.ckpt",
+  "clap_checkpoint_path": "/abs/path/checkpoint/music_speech_audioset_epoch_15_esc_89.98.pt",
+  "roberta_dir": "/abs/path/roberta-base"
+}
+```
+
+**2) separate**
+
+```json
+{
+  "cmd": "separate",
+  "input": "/abs/path/input.wav",
+  "output": "/abs/path/output.wav",
+  "text": "harmonica",
+  "use_chunk": false
+}
+```
+
+### Parameters
+
+- `config_path` (load_model): AudioSep YAML config.
+- `checkpoint_path` (load_model): AudioSep main checkpoint.
+- `clap_checkpoint_path` (load_model): CLAP checkpoint.
+- `roberta_dir` (load_model): Local RoBERTa directory.
+- `input` (separate): Input WAV path.
+- `output` (separate): Output WAV path.
+- `text` (separate): Query text (e.g. `"harmonica"`, `"vocals"`).
+- `use_chunk` (separate): `true` uses chunked inference (faster on long audio, can add artifacts on short clips). `false` uses full pass (best quality on short clips).
+
+### Example
+
+```bash
+printf '%s\n' \
+  '{"cmd":"load_model","config_path":"/abs/path/config/audiosep_base.yaml","checkpoint_path":"/abs/path/checkpoint/audiosep_base_4M_steps.ckpt","clap_checkpoint_path":"/abs/path/checkpoint/music_speech_audioset_epoch_15_esc_89.98.pt","roberta_dir":"/abs/path/roberta-base"}' \
+  '{"cmd":"separate","input":"/abs/path/harmonica_audiosep.wav","output":"/abs/path/out_nochunk.wav","text":"harmonica","use_chunk":false}' \
+  '{"cmd":"separate","input":"/abs/path/harmonica_audiosep.wav","output":"/abs/path/out_chunk.wav","text":"harmonica","use_chunk":true}' \
+  '{"cmd":"exit"}' \
+  | ./dist/dsu-audiosep/dsu-audiosep --worker
+```
+
 ## Required repo layout (for GitHub Actions)
 
 These paths must exist in the repo root:
