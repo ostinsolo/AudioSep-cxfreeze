@@ -35,8 +35,14 @@ def separate_audio(model, audio_file, text, output_file, device='cuda', use_chun
         } 
 
         if use_chunk:
-            sep_segment = model.ss_model.chunk_inference(input_dict)
-            sep_segment = np.squeeze(sep_segment)
+            # Avoid chunk artifacts on short clips: fall back to full pass
+            window = (1.0 + 3.0 + 1.0) * 32000  # NL + NC + NR at 32 kHz
+            if input_dict["mixture"].shape[2] <= window * 2:
+                sep_segment = model.ss_model(input_dict)["waveform"]
+                sep_segment = sep_segment.squeeze(0).squeeze(0).data.cpu().numpy()
+            else:
+                sep_segment = model.ss_model.chunk_inference(input_dict)
+                sep_segment = np.squeeze(sep_segment)
         else:
             sep_segment = model.ss_model(input_dict)["waveform"]
             sep_segment = sep_segment.squeeze(0).squeeze(0).data.cpu().numpy()
