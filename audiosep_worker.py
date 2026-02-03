@@ -198,6 +198,31 @@ def send_json(obj):
     sys.stdout.flush()
 
 
+def _load_runtime_policy():
+    path = os.path.expanduser(
+        os.environ.get("DSU_RUNTIME_POLICY_PATH", "~/.dsu/runtime_policy.json")
+    )
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            return json.load(handle)
+    except FileNotFoundError:
+        return {}
+    except Exception:
+        return {}
+
+
+def _get_policy_value(policy, section, key, default=None):
+    if not isinstance(policy, dict):
+        return default
+    section_values = policy.get(section, {})
+    if isinstance(section_values, dict) and key in section_values:
+        return section_values[key]
+    global_values = policy.get("global", {})
+    if isinstance(global_values, dict) and key in global_values:
+        return global_values[key]
+    return default
+
+
 def _parse_use_torch_stft(value):
     if isinstance(value, str) and value.lower() == "auto":
         return "auto", False
@@ -212,7 +237,7 @@ def _get_audio_duration_seconds(path):
 
 
 def worker_mode():
-    def _parse_max_cached_models(argv):
+    def _parse_max_cached_models(argv, policy_default=None):
         if "--max-cached-models" in argv:
             idx = argv.index("--max-cached-models")
             if idx + 1 < len(argv):
@@ -226,12 +251,23 @@ def worker_mode():
                 return max(0, int(env_val))
             except ValueError:
                 pass
+        if policy_default is not None:
+            try:
+                return max(0, int(policy_default))
+            except (ValueError, TypeError):
+                pass
         return 1
+
+    policy = _load_runtime_policy()
+    policy_max_cached = _get_policy_value(policy, "audiosep", "max_cached_models")
+    policy_use_torch_stft = _get_policy_value(policy, "audiosep", "use_torch_stft")
+    policy_auto_stft = _get_policy_value(policy, "audiosep", "auto_stft_seconds")
+    policy_mmap = _get_policy_value(policy, "audiosep", "mmap")
 
     model = None
     model_cache = {}
     cache_order = []
-    max_cached_models = _parse_max_cached_models(sys.argv)
+    max_cached_models = _parse_max_cached_models(sys.argv, policy_default=policy_max_cached)
     device = None
     config_path = None
     checkpoint_path = None
@@ -330,13 +366,31 @@ def worker_mode():
             clap_checkpoint_path = job.get("clap_checkpoint_path")
             roberta_dir = job.get("roberta_dir")
             device_str = job.get("device")
-            use_torch_stft_mode, use_torch_stft_value = _parse_use_torch_stft(job.get("use_torch_stft", False))
+            if "use_torch_stft" in job:
+                use_torch_stft_mode, use_torch_stft_value = _parse_use_torch_stft(job.get("use_torch_stft"))
+            elif policy_use_torch_stft is not None:
+                use_torch_stft_mode, use_torch_stft_value = _parse_use_torch_stft(policy_use_torch_stft)
+            else:
+                use_torch_stft_mode, use_torch_stft_value = _parse_use_torch_stft(False)
             if use_torch_stft_mode == "auto":
-                try:
-                    auto_stft_seconds = float(job.get("auto_stft_seconds", 60.0))
-                except (TypeError, ValueError):
+                if "auto_stft_seconds" in job:
+                    try:
+                        auto_stft_seconds = float(job.get("auto_stft_seconds"))
+                    except (TypeError, ValueError):
+                        auto_stft_seconds = 60.0
+                elif policy_auto_stft is not None:
+                    try:
+                        auto_stft_seconds = float(policy_auto_stft)
+                    except (TypeError, ValueError):
+                        auto_stft_seconds = 60.0
+                else:
                     auto_stft_seconds = 60.0
-            mmap_load = bool(job.get("mmap", False))
+            if "mmap" in job:
+                mmap_load = bool(job.get("mmap"))
+            elif policy_mmap is not None:
+                mmap_load = bool(policy_mmap)
+            else:
+                mmap_load = False
             if device_str:
                 device = torch.device(device_str)
 

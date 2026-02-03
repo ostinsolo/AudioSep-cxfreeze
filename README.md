@@ -84,6 +84,20 @@ Send one JSON command per line via stdin. Responses are JSON on stdout.
 
 - `--max-cached-models N`: keep up to `N` models in memory (LRU). Default `1`.
 
+### Runtime policy (optional)
+
+Workers can read a shared policy file to keep cache and MPS/STFT settings
+consistent across runtimes without coupling processes.
+
+Default path: `~/.dsu/runtime_policy.json`  
+Override: `DSU_RUNTIME_POLICY_PATH=/abs/path/runtime_policy.json`
+
+AudioSep keys (optional):
+- `audiosep.max_cached_models`
+- `audiosep.use_torch_stft` (`true`, `false`, or `"auto"`)
+- `audiosep.auto_stft_seconds`
+- `audiosep.mmap`
+
 ### Example
 
 ```bash
