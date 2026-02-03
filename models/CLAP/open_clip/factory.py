@@ -52,7 +52,7 @@ _rescan_model_configs()  # initial populate of model config registry
 
 
 def load_state_dict(checkpoint_path: str, map_location="cpu", skip_params=True):
-    checkpoint = torch.load(checkpoint_path, map_location=map_location, weights_only=False)
+    checkpoint = torch.load(checkpoint_path, map_location=map_location)
     if isinstance(checkpoint, dict) and "state_dict" in checkpoint:
         state_dict = checkpoint["state_dict"]
     else:
@@ -150,7 +150,7 @@ def create_model(
                     f"Loading pretrained {amodel_name}-{tmodel_name} weights ({pretrained})."
                 )
                 ckpt = load_state_dict(checkpoint_path, skip_params=True)
-                model.load_state_dict(ckpt, strict=False)
+                model.load_state_dict(ckpt)
                 param_names = [n for n, p in model.named_parameters()]
                 # for n in param_names:
                 #     print(n, "\t", "Loaded" if n in ckpt else "Unloaded")

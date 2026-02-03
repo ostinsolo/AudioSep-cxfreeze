@@ -5,7 +5,6 @@ Adapted to the Audio Task.
 """
 
 from collections import OrderedDict
-import os
 from dataclasses import dataclass
 from email.mime import audio
 from typing import Tuple, Union, Callable, Optional
