@@ -67,6 +67,8 @@ Record results in seconds. Include device, model, and file duration.
 |------|--------|------|-------|------|----------|----------|----------|-------|
 | 2026-02-03 | mps | worker/frozen | audiosep_base | 15_1_29_2_2_2026_.wav | ? | 0.45 | 0.10 | Local frozen build, use_chunk=true |
 | 2026-02-03 | mps | worker/frozen | audiosep_base | 15_1_29_2_2_2026_.wav | ? | 0.73 | 0.10 | Downloaded build failed: `NameError: os is not defined` in `open_clip/model.py` |
+| 2026-02-03 | mps | worker/frozen | audiosep_base | harmonica_audiosep.wav | ? | 0.48 | 0.09 | Local frozen build, use_chunk=true |
+| 2026-02-03 | mps | worker/frozen | audiosep_base | 1_28_46_1_31_2026_.wav | ? | 0.84 | 0.51 | Local frozen build, use_chunk=true |
 |      | cpu    | worker/frozen | audiosep_base | test_4s.wav | 4s |  |  |  |
 |      | cuda   | worker/frozen | audiosep_base | test_4s.wav | 4s |  |  |  |
 
