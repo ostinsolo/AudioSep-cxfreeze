@@ -48,8 +48,15 @@ def _install_dummy_lightning():
     class _LightningModule(torch.nn.Module):
         @classmethod
         def load_from_checkpoint(cls, checkpoint_path, strict=False, map_location=None, **kwargs):
+            mmap_flag = bool(kwargs.pop("mmap", False))
             instance = cls(**kwargs)
-            state = torch.load(checkpoint_path, map_location=map_location)
+            if mmap_flag:
+                try:
+                    state = torch.load(checkpoint_path, map_location=map_location, mmap=True, weights_only=False)
+                except TypeError:
+                    state = torch.load(checkpoint_path, map_location=map_location, weights_only=False)
+            else:
+                state = torch.load(checkpoint_path, map_location=map_location, weights_only=False)
             state_dict = state.get("state_dict", state)
             instance.load_state_dict(state_dict, strict=strict)
             return instance
@@ -191,7 +198,26 @@ def send_json(obj):
 
 
 def worker_mode():
+    def _parse_max_cached_models(argv):
+        if "--max-cached-models" in argv:
+            idx = argv.index("--max-cached-models")
+            if idx + 1 < len(argv):
+                try:
+                    return max(0, int(argv[idx + 1]))
+                except ValueError:
+                    pass
+        env_val = os.environ.get("AUDIOSEP_MAX_CACHED_MODELS")
+        if env_val:
+            try:
+                return max(0, int(env_val))
+            except ValueError:
+                pass
+        return 1
+
     model = None
+    model_cache = {}
+    cache_order = []
+    max_cached_models = _parse_max_cached_models(sys.argv)
     device = None
     config_path = None
     checkpoint_path = None
@@ -247,6 +273,8 @@ def worker_mode():
             clap_checkpoint_path = job.get("clap_checkpoint_path")
             roberta_dir = job.get("roberta_dir")
             device_str = job.get("device")
+            use_torch_stft = bool(job.get("use_torch_stft", False))
+            mmap_load = bool(job.get("mmap", False))
             if device_str:
                 device = torch.device(device_str)
 
@@ -269,6 +297,8 @@ def worker_mode():
                 os.environ["AUDIOSEP_CLAP_CKPT"] = clap_checkpoint_path
             if roberta_dir:
                 os.environ["AUDIOSEP_ROBERTA_DIR"] = roberta_dir
+            os.environ["AUDIOSEP_USE_TORCH_STFT"] = "1" if use_torch_stft else "0"
+            os.environ["AUDIOSEP_MMAP_LOAD"] = "1" if mmap_load else "0"
 
             if not os.path.exists(config_path):
                 send_json({"status": "error", "message": f"Config not found: {config_path}"})
@@ -283,14 +313,50 @@ def worker_mode():
                 send_json({"status": "error", "message": f"RoBERTa dir not found: {roberta_dir}"})
                 continue
 
+            cache_key = (
+                os.path.abspath(config_path),
+                os.path.abspath(checkpoint_path),
+                os.path.abspath(clap_checkpoint_path) if clap_checkpoint_path else "",
+                os.path.abspath(roberta_dir) if roberta_dir else "",
+                str(device),
+                bool(use_torch_stft),
+                bool(mmap_load),
+            )
+
+            if cache_key in model_cache:
+                model = model_cache[cache_key]
+                if cache_key in cache_order:
+                    cache_order.remove(cache_key)
+                cache_order.append(cache_key)
+                send_json({
+                    "status": "model_loaded",
+                    "elapsed": 0.0,
+                    "checkpoint_path": checkpoint_path,
+                    "clap_checkpoint_path": clap_checkpoint_path,
+                    "roberta_dir": roberta_dir,
+                    "config_path": config_path,
+                    "device": str(device),
+                    "cached": True,
+                    "cache_size": len(model_cache),
+                    "max_cached_models": max_cached_models,
+                })
+                continue
+
             try:
                 t0 = time.time()
                 model = build_audiosep(
                     config_yaml=config_path,
                     checkpoint_path=checkpoint_path,
                     device=device,
+                    mmap=mmap_load,
                 )
                 elapsed = round(time.time() - t0, 2)
+                if max_cached_models > 0:
+                    model_cache[cache_key] = model
+                    cache_order.append(cache_key)
+                    while len(cache_order) > max_cached_models:
+                        evict_key = cache_order.pop(0)
+                        model_cache.pop(evict_key, None)
                 send_json({
                     "status": "model_loaded",
                     "elapsed": elapsed,
@@ -299,6 +365,9 @@ def worker_mode():
                     "roberta_dir": roberta_dir,
                     "config_path": config_path,
                     "device": str(device),
+                    "cached": False,
+                    "cache_size": len(model_cache),
+                    "max_cached_models": max_cached_models,
                 })
             except Exception as e:
                 send_json({

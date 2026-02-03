@@ -69,6 +69,23 @@ Record results in seconds. Include device, model, and file duration.
 | 2026-02-03 | mps | worker/frozen | audiosep_base | 15_1_29_2_2_2026_.wav | ? | 0.73 | 0.10 | Downloaded build failed: `NameError: os is not defined` in `open_clip/model.py` |
 | 2026-02-03 | mps | worker/frozen | audiosep_base | harmonica_audiosep.wav | ? | 0.48 | 0.09 | Local frozen build, use_chunk=true |
 | 2026-02-03 | mps | worker/frozen | audiosep_base | 1_28_46_1_31_2026_.wav | ? | 0.84 | 0.51 | Local frozen build, use_chunk=true |
+
+## Optimization Tests (Runtime Env, pre-freeze)
+
+Environment: `test_audiosep/runtime` (PyTorch 2.10, MPS)  
+Inputs: `harmonica_audiosep.wav` (harmonica) + `1_28_46_1_31_2026_.wav` (vocals)  
+Mode: `use_chunk=false`
+
+| Variant | Model Load (s) | Harmonica (s) | Long (s) | Notes |
+|---------|----------------|---------------|----------|-------|
+| Baseline (torchlibrosa, no mmap) | 2.79 | 0.46 | 0.35 | |
+| mmap only | 2.40 | 0.44 | 0.30 | Faster load + slight inference win |
+| MPS STFT only | 2.39 | 0.45 | 0.30 | Warns about `torch.istft` resize |
+| mmap + MPS STFT | 2.26 | 0.57 | 0.34 | Load fastest, harmonica slower |
+
+Cache test (`--max-cached-models 2`):
+- First `load_model`: 2.82s (cached=false)
+- Second `load_model`: 0.00s (cached=true)
 |      | cpu    | worker/frozen | audiosep_base | test_4s.wav | 4s |  |  |  |
 |      | cuda   | worker/frozen | audiosep_base | test_4s.wav | 4s |  |  |  |
 

@@ -356,7 +356,8 @@ def get_ss_model(config_yaml) -> nn.Module:
 def load_ss_model(
     configs: Dict,
     checkpoint_path: str,
-    query_encoder: nn.Module
+    query_encoder: nn.Module,
+    mmap: bool = False,
 ) -> nn.Module:
     r"""Load trained universal source separation model."""
     ss_model_type = configs["model"]["model_type"]
@@ -382,6 +383,7 @@ def load_ss_model(
         learning_rate=None,
         lr_lambda_func=None,
         map_location=torch.device('cpu'),
+        mmap=mmap,
     )
 
     return pl_model

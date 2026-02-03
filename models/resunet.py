@@ -1,4 +1,5 @@
 import numpy as np
+import os
 from typing import Dict, List, NoReturn, Tuple
 import torch
 import torch.nn as nn
@@ -79,6 +80,63 @@ class FiLM(nn.Module):
                 film_data[module_name] = self.calculate_film_data(conditions, module)
 
         return film_data
+
+
+class _NativeSTFT(nn.Module):
+    def __init__(self, n_fft, hop_length, win_length, window, center, pad_mode):
+        super().__init__()
+        if window != "hann":
+            raise ValueError(f"Unsupported window: {window}")
+        self.n_fft = n_fft
+        self.hop_length = hop_length
+        self.win_length = win_length
+        self.center = center
+        self.pad_mode = pad_mode
+        self.register_buffer("window", torch.hann_window(win_length))
+
+    def forward(self, input_tensor):
+        window = self.window.to(input_tensor.device)
+        stft = torch.stft(
+            input_tensor,
+            n_fft=self.n_fft,
+            hop_length=self.hop_length,
+            win_length=self.win_length,
+            window=window,
+            center=self.center,
+            pad_mode=self.pad_mode,
+            return_complex=False,
+        )
+        real = stft[..., 0].permute(0, 2, 1).unsqueeze(1)
+        imag = stft[..., 1].permute(0, 2, 1).unsqueeze(1)
+        return real, imag
+
+
+class _NativeISTFT(nn.Module):
+    def __init__(self, n_fft, hop_length, win_length, window, center, pad_mode):
+        super().__init__()
+        if window != "hann":
+            raise ValueError(f"Unsupported window: {window}")
+        self.n_fft = n_fft
+        self.hop_length = hop_length
+        self.win_length = win_length
+        self.center = center
+        self.pad_mode = pad_mode
+        self.register_buffer("window", torch.hann_window(win_length))
+
+    def forward(self, real, imag, length=None):
+        window = self.window.to(real.device)
+        real = real.squeeze(1).permute(0, 2, 1)
+        imag = imag.squeeze(1).permute(0, 2, 1)
+        complex_spec = torch.complex(real, imag)
+        return torch.istft(
+            complex_spec,
+            n_fft=self.n_fft,
+            hop_length=self.hop_length,
+            win_length=self.win_length,
+            window=window,
+            center=self.center,
+            length=length,
+        )
 
 
 class ConvBlockRes(nn.Module):
@@ -281,25 +339,44 @@ class ResUNet30_Base(nn.Module, Base):
         
         self.time_downsample_ratio = 2 ** 5  # This number equals 2^{#encoder_blcoks}
 
-        self.stft = STFT(
-            n_fft=window_size,
-            hop_length=hop_size,
-            win_length=window_size,
-            window=window,
-            center=center,
-            pad_mode=pad_mode,
-            freeze_parameters=True,
-        )
+        use_native = os.environ.get("AUDIOSEP_USE_TORCH_STFT") == "1"
+        if use_native:
+            self.stft = _NativeSTFT(
+                n_fft=window_size,
+                hop_length=hop_size,
+                win_length=window_size,
+                window=window,
+                center=center,
+                pad_mode=pad_mode,
+            )
+            self.istft = _NativeISTFT(
+                n_fft=window_size,
+                hop_length=hop_size,
+                win_length=window_size,
+                window=window,
+                center=center,
+                pad_mode=pad_mode,
+            )
+        else:
+            self.stft = STFT(
+                n_fft=window_size,
+                hop_length=hop_size,
+                win_length=window_size,
+                window=window,
+                center=center,
+                pad_mode=pad_mode,
+                freeze_parameters=True,
+            )
 
-        self.istft = ISTFT(
-            n_fft=window_size,
-            hop_length=hop_size,
-            win_length=window_size,
-            window=window,
-            center=center,
-            pad_mode=pad_mode,
-            freeze_parameters=True,
-        )
+            self.istft = ISTFT(
+                n_fft=window_size,
+                hop_length=hop_size,
+                win_length=window_size,
+                window=window,
+                center=center,
+                pad_mode=pad_mode,
+                freeze_parameters=True,
+            )
 
         self.bn0 = nn.BatchNorm2d(window_size // 2 + 1, momentum=momentum)
 
