@@ -679,14 +679,6 @@ class ResUNet30(nn.Module):
         WINDOW = NL + NC + NR
         current_idx = 0
 
-        # Short audio: fallback to full forward pass
-        if L <= WINDOW:
-            chunk_out = self.base(
-                mixtures=mixtures,
-                film_dict=film_dict,
-            )['waveform']
-            return chunk_out.squeeze(0).cpu().data.numpy()
-
         while current_idx + WINDOW < L:
             chunk_in = mixtures[:, :, current_idx:current_idx + WINDOW]
 

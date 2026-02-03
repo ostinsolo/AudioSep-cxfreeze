@@ -49,7 +49,7 @@ def main():
         exe += ".exe"
 
     input_wav = "/Users/ostino/Music/harmonica_audiosep.wav"
-    output_wav = os.path.join(project_root, "test_output", "dsu_audiosep_out.wav")
+    output_wav = os.path.join(project_root, "test_output", "dsu_audiosep_out_nochunk.wav")
     os.makedirs(os.path.dirname(output_wav), exist_ok=True)
 
     if not os.path.exists(exe):
@@ -102,7 +102,7 @@ def main():
             "input": input_wav,
             "output": output_wav,
             "text": "mouth harmonica",
-            "use_chunk": True,
+            "use_chunk": False,
         }
         proc.stdin.write(json.dumps(sep_cmd) + "\n")
         proc.stdin.flush()
