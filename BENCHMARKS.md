@@ -65,7 +65,7 @@ Record results in seconds. Include device, model, and file duration.
 
 | Date | Device | Mode | Model | File | Duration | Cold (s) | Warm (s) | Notes |
 |------|--------|------|-------|------|----------|----------|----------|-------|
-| 2026-02-03 | mps | worker/frozen | audiosep_base | 15_1_29_2_2_2026_.wav | ? | 0.73 | 0.10 | Local frozen build, use_chunk=true |
+| 2026-02-03 | mps | worker/frozen | audiosep_base | 15_1_29_2_2_2026_.wav | ? | 0.45 | 0.10 | Local frozen build, use_chunk=true |
 | 2026-02-03 | mps | worker/frozen | audiosep_base | 15_1_29_2_2_2026_.wav | ? | 0.73 | 0.10 | Downloaded build failed: `NameError: os is not defined` in `open_clip/model.py` |
 |      | cpu    | worker/frozen | audiosep_base | test_4s.wav | 4s |  |  |  |
 |      | cuda   | worker/frozen | audiosep_base | test_4s.wav | 4s |  |  |  |
