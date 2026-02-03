@@ -1,0 +1,20 @@
+# Runtime / build
+.venv/
+venv/
+runtime/
+runtime-intel/
+dist/
+*.pyc
+__pycache__/
+*.egg-info/
+.eggs/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Large / optional (do not commit full checkpoints if large)
+# checkpoint/*.ckpt
+# roberta-base/

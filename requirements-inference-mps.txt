@@ -1,0 +1,17 @@
+# Inference-only dependencies for DSU-Audiosep (Mac ARM / MPS)
+torch>=2.10,<2.11
+torchaudio>=2.10,<2.11
+torchvision>=0.15
+numpy
+scipy
+soundfile>=0.12
+librosa>=0.10
+pyyaml
+torchlibrosa==0.1.0
+transformers==4.30.2
+ftfy
+regex
+tqdm
+h5py
+pillow
+cx-Freeze==6.15.16

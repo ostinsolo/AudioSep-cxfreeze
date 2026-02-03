@@ -1,0 +1,122 @@
+#!/usr/bin/env python3
+import os
+import sys
+import shutil
+
+from cx_Freeze import Executable, setup
+
+sys.setrecursionlimit(5000)
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = SCRIPT_DIR
+
+APP_NAME = "DSU-Audiosep"
+APP_VERSION = "0.1.0"
+
+OUTPUT_DIR = os.path.join(PROJECT_ROOT, "dist", "dsu-audiosep")
+if os.path.exists(OUTPUT_DIR):
+    print(f"Removing previous build: {OUTPUT_DIR}")
+    shutil.rmtree(OUTPUT_DIR)
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+include_files = []
+
+config_dir = os.path.join(PROJECT_ROOT, "config")
+if os.path.exists(config_dir):
+    include_files.append((config_dir, "config"))
+
+checkpoint_dir = os.path.join(PROJECT_ROOT, "checkpoint")
+if os.path.exists(checkpoint_dir):
+    pass
+
+clap_configs = os.path.join(PROJECT_ROOT, "models", "CLAP", "open_clip", "model_configs")
+if os.path.exists(clap_configs):
+    include_files.append((clap_configs, os.path.join("models", "CLAP", "open_clip", "model_configs")))
+
+clap_vocab = os.path.join(PROJECT_ROOT, "models", "CLAP", "open_clip", "bpe_simple_vocab_16e6.txt.gz")
+if os.path.exists(clap_vocab):
+    include_files.append((clap_vocab, os.path.join("models", "CLAP", "open_clip", "bpe_simple_vocab_16e6.txt.gz")))
+
+packages = [
+    "torch",
+    "torch.nn",
+    "torch.nn.functional",
+    "torch.utils",
+    "torch._C",
+    "torch.cuda",
+    "torch.amp",
+    "torch.backends",
+    "torch.fft",
+    "torch.linalg",
+    "torch.distributions",
+    "torchaudio",
+    "torchvision",
+    "torchlibrosa",
+    "numpy",
+    "scipy",
+    "soundfile",
+    "librosa",
+    "yaml",
+    "transformers",
+    "huggingface_hub",
+    "ftfy",
+    "regex",
+    "tqdm",
+    "h5py",
+    "PIL",
+    "models",
+    "models.CLAP",
+    "models.CLAP.open_clip",
+]
+
+excludes = [
+    "models.CLAP.training",
+    "data",
+    "evaluation",
+    "callbacks",
+    "optimizers",
+    "losses",
+    "train",
+    "benchmark",
+    "predict",
+    "run_test",
+    "AudioSep_Colab",
+    "lightning",
+    "lightning.pytorch",
+    "pytorch_lightning",
+    "torchmetrics",
+    "webdataset",
+    "pandas",
+    "sklearn",
+    "scikit_learn",
+]
+
+build_exe_options = {
+    "packages": packages,
+    "excludes": excludes,
+    "include_files": include_files,
+    "zip_include_packages": [],
+    "zip_exclude_packages": "*",
+    "build_exe": OUTPUT_DIR,
+}
+
+exe_suffix = ".exe" if sys.platform == "win32" else ""
+base = "Console" if sys.platform == "win32" else None
+
+executables = [
+    Executable(
+        script=os.path.join(PROJECT_ROOT, "audiosep_worker.py"),
+        target_name=f"dsu-audiosep{exe_suffix}",
+        base=base,
+    ),
+]
+
+if len(sys.argv) == 1:
+    sys.argv.append("build_exe")
+
+setup(
+    name=APP_NAME,
+    version=APP_VERSION,
+    description="DSU Audiosep (inference-only)",
+    options={"build_exe": build_exe_options},
+    executables=executables,
+)

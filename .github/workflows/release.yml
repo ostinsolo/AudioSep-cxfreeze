@@ -1,0 +1,229 @@
+name: Release AudioSep cx_Freeze
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g., v0.1.0)'
+        required: true
+        type: string
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  # =============================================================================
+  # Windows CUDA Build (PyTorch 2.10 + CUDA 12.6)
+  # =============================================================================
+  build-windows-cuda:
+    name: Windows CUDA
+    runs-on: windows-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install uv
+        run: |
+          powershell -Command "irm https://astral.sh/uv/install.ps1 | iex"
+          $env:Path = "$env:USERPROFILE\.local\bin;$env:Path"
+          uv --version
+
+      - name: Cache uv packages
+        uses: actions/cache@v4
+        with:
+          path: ~\AppData\Local\uv\Cache
+          key: ${{ runner.os }}-uv-audiosep-cuda-${{ hashFiles('requirements-inference-windows-cuda.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-audiosep-cuda-
+
+      - name: Install dependencies
+        run: |
+          $env:Path = "$env:USERPROFILE\.local\bin;$env:Path"
+          uv pip install --system -r requirements-inference-windows-cuda.txt
+
+      - name: Build dsu-audiosep
+        run: python build_dsu_audiosep.py
+
+      - name: Smoke test
+        shell: cmd
+        run: |
+          echo Checking executables...
+          dir dist\dsu-audiosep\dsu-audiosep.exe
+
+      - name: Create archive
+        run: |
+          Invoke-WebRequest -Uri https://www.7-zip.org/a/7zr.exe -OutFile 7zr.exe
+          .\7zr.exe a -m0=lzma2 -mmt=on -mx=7 "audiosep-win-cuda.7z" ".\dist\dsu-audiosep"
+        shell: pwsh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: audiosep-win-cuda
+          path: audiosep-win-cuda.7z
+
+  # =============================================================================
+  # Windows CPU Build
+  # =============================================================================
+  build-windows-cpu:
+    name: Windows CPU
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install uv
+        run: |
+          powershell -Command "irm https://astral.sh/uv/install.ps1 | iex"
+          $env:Path = "$env:USERPROFILE\.local\bin;$env:Path"
+          uv --version
+
+      - name: Cache uv packages
+        uses: actions/cache@v4
+        with:
+          path: ~\AppData\Local\uv\Cache
+          key: ${{ runner.os }}-uv-audiosep-cpu-${{ hashFiles('requirements-inference-windows-cpu.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-audiosep-cpu-
+
+      - name: Install dependencies
+        run: |
+          $env:Path = "$env:USERPROFILE\.local\bin;$env:Path"
+          uv pip install --system -r requirements-inference-windows-cpu.txt
+
+      - name: Build dsu-audiosep
+        run: python build_dsu_audiosep.py
+
+      - name: Smoke test
+        shell: cmd
+        run: dir dist\dsu-audiosep\dsu-audiosep.exe
+
+      - name: Create archive
+        run: Compress-Archive -Path ".\dist\dsu-audiosep" -DestinationPath "audiosep-win-cpu.zip"
+        shell: pwsh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: audiosep-win-cpu
+          path: audiosep-win-cpu.zip
+
+  # =============================================================================
+  # macOS ARM Build (Apple Silicon + MPS)
+  # =============================================================================
+  build-mac-arm:
+    name: macOS ARM
+    runs-on: macos-14
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          export PATH="$HOME/.cargo/bin:$PATH"
+          uv --version
+
+      - name: Cache uv packages
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/uv
+          key: ${{ runner.os }}-uv-audiosep-mps-${{ hashFiles('requirements-inference-mps.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-audiosep-mps-
+
+      - name: Install dependencies
+        run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          uv venv
+          source .venv/bin/activate
+          uv pip install -r requirements-inference-mps.txt
+
+      - name: Build dsu-audiosep
+        run: |
+          source .venv/bin/activate
+          python build_dsu_audiosep.py
+
+      - name: Smoke test
+        run: |
+          ls -la dist/dsu-audiosep/dsu-audiosep
+
+      - name: Create archive
+        run: tar -czf audiosep-mac-arm.tar.gz -C dist dsu-audiosep
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: audiosep-mac-arm
+          path: audiosep-mac-arm.tar.gz
+
+  # =============================================================================
+  # Release
+  # =============================================================================
+  release:
+    name: Create Release
+    needs: [build-windows-cuda, build-windows-cpu, build-mac-arm]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "version=${{ inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          name: AudioSep cx_Freeze ${{ steps.version.outputs.version }}
+          body: |
+            ## AudioSep cx_Freeze ${{ steps.version.outputs.version }}
+            
+            **Standalone frozen runtime for language-queried audio separation (AudioSep).**
+            
+            Works independently from DSU: its own runtime and worker (`dsu-audiosep`).
+            
+            ### Downloads
+            
+            | Platform | File | GPU |
+            |----------|------|-----|
+            | **Windows CUDA** | `audiosep-win-cuda.7z` | NVIDIA CUDA 12.6 |
+            | **Windows CPU** | `audiosep-win-cpu.zip` | None |
+            | **macOS ARM** | `audiosep-mac-arm.tar.gz` | MPS (Metal) |
+            | **macOS Intel** | (manual build) | CPU |
+            
+            ### Usage (worker mode)
+            
+            Start the worker, then send JSON over stdin/stdout:
+            
+            ```json
+            {"cmd": "load_model", "config_path": "...", "checkpoint_path": "...", "clap_checkpoint_path": "...", "roberta_dir": "..."}
+            {"cmd": "separate", "input": "audio.wav", "output": "out.wav", "text": "vocals", "use_chunk": true}
+            ```
+            
+            See [MODEL_DOWNLOADS.md](MODEL_DOWNLOADS.md) for checkpoint URLs.
+          files: |
+            ./artifacts/audiosep-win-cuda/audiosep-win-cuda.7z
+            ./artifacts/audiosep-win-cpu/audiosep-win-cpu.zip
+            ./artifacts/audiosep-mac-arm/audiosep-mac-arm.tar.gz
+          draft: false
+          prerelease: false

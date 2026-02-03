@@ -1,0 +1,23 @@
+# Inference-only dependencies for DSU-Audiosep (Windows CPU)
+# Python: 3.10
+
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+torch==2.10.0+cpu
+torchaudio==2.10.0+cpu
+torchvision==0.25.0+cpu
+numpy>=2.0.0
+scipy
+soundfile>=0.12
+librosa>=0.10
+pyyaml
+torchlibrosa==0.1.0
+transformers==4.30.2
+ftfy
+regex
+tqdm
+h5py
+pillow
+numba
+llvmlite
+cx-Freeze==6.15.16

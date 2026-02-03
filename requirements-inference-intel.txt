@@ -1,0 +1,20 @@
+# Inference-only dependencies for DSU-Audiosep (Mac Intel x86_64 / CPU)
+# Python: 3.10
+# Note: PyTorch 2.3+ not available for Intel Mac; use 2.2.2
+
+torch==2.2.2
+torchaudio==2.2.2
+torchvision==0.17.2
+numpy<2
+scipy
+soundfile>=0.12
+librosa>=0.10
+pyyaml
+torchlibrosa==0.1.0
+transformers==4.30.2
+ftfy
+regex
+tqdm
+h5py
+pillow
+cx-Freeze==6.15.16
