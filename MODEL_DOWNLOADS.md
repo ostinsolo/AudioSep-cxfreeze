@@ -19,7 +19,7 @@ Primary checkpoints used for inference:
      - `merges.txt`
      - `tokenizer.json`
      - `tokenizer_config.json`
-     - `special_tokens_map.json`
+     - `special_tokens_map.json` (optional; 404 for roberta-base)
    - URLs:
      - `https://huggingface.co/roberta-base/resolve/main/config.json`
      - `https://huggingface.co/roberta-base/resolve/main/pytorch_model.bin`
@@ -27,7 +27,6 @@ Primary checkpoints used for inference:
      - `https://huggingface.co/roberta-base/resolve/main/merges.txt`
      - `https://huggingface.co/roberta-base/resolve/main/tokenizer.json`
      - `https://huggingface.co/roberta-base/resolve/main/tokenizer_config.json`
-     - `https://huggingface.co/roberta-base/resolve/main/special_tokens_map.json`
 
 Hugging Face checkpoint directory (browse for additional or larger variants):
 

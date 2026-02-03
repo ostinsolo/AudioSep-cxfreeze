@@ -107,6 +107,31 @@ Query: `vocals`, `use_chunk=false`
 |---------|----------------|---------|----------|-------|
 | Baseline (torchlibrosa) | 2.83 | 2.16 | 11.24 | |
 | MPS STFT | 3.08 | 1.54 | 3.52 | `torch.istft` resize warning |
+
+### Persistence benchmark (spawn vs. persistent worker)
+
+Worker: `audiosep_worker.py` (runtime env)  
+Inputs: `harmonica_audiosep.wav` + `18_0_43_1_30_2026_.wav`  
+Mode: `use_torch_stft=auto`, `auto_stft_seconds=60`, `use_chunk=false`
+
+| Variant | Total (s) | Per-job (s) | Notes |
+|---------|-----------|-------------|-------|
+| Spawn-per-job | 12.04 | 0.46, 3.33 | Load model each run |
+| Persistent worker | 7.47 | 0.44, 3.11 | Single long-lived process |
+
+### Cold vs warm and sequence
+
+Worker: `audiosep_worker.py` (runtime env)  
+Mode: `use_torch_stft=auto`, `auto_stft_seconds=60`, `use_chunk=false`
+
+Cold starts (spawn → load → separate → exit):
+- Short (`harmonica_audiosep.wav`): startup 1.42s, load 2.73s, separate 0.44s, total 4.58s
+- Long (`18_0_43_1_30_2026_.wav`): startup 1.25s, load 2.62s, separate 3.30s, total 7.17s
+
+Persistent sequence (short → long → short → long):
+- Startup 1.24s, load 2.65s
+- Per-job: 0.44s, 3.07s, 2.24s, 3.05s
+- Total: 12.69s
 |      | cpu    | worker/frozen | audiosep_base | test_4s.wav | 4s |  |  |  |
 |      | cuda   | worker/frozen | audiosep_base | test_4s.wav | 4s |  |  |  |
 

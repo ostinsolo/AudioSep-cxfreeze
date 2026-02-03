@@ -109,6 +109,23 @@ printf '%s\n' \
   | ./dist/dsu-audiosep/dsu-audiosep --worker
 ```
 
+### Benchmark persistence (spawn vs. persistent)
+
+This compares spawning a worker per job vs a single long-lived worker.
+
+```bash
+python benchmark_worker_persistence.py \
+  --config /abs/path/config/audiosep_base.yaml \
+  --checkpoint /abs/path/checkpoint/audiosep_base_4M_steps.ckpt \
+  --clap /abs/path/checkpoint/music_speech_audioset_epoch_15_esc_89.98.pt \
+  --roberta /abs/path/roberta-base \
+  --inputs /abs/path/a.wav /abs/path/b.wav \
+  --out-dir /tmp/audiosep_bench \
+  --text vocals \
+  --use-torch-stft auto \
+  --auto-stft-seconds 60
+```
+
 ## Required repo layout (for GitHub Actions)
 
 These paths must exist in the repo root:
