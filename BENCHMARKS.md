@@ -12,6 +12,11 @@ Use consistent audio files for repeatable timing:
 
 If you use different files, record them below with duration.
 
+Windows CUDA inputs (size-based, Documents folder):
+- `22_9_4_1_28_2026_.wav` (~169 KB)
+- `17_24_54_1_27_2026_.wav` (~543 KB)
+- `0_52_50_1_29_2026_.wav` (~7.25 MB)
+
 ## Benchmark Method
 
 We measure **cold** and **warm** timings.
@@ -69,6 +74,17 @@ Record results in seconds. Include device, model, and file duration.
 | 2026-02-03 | mps | worker/frozen | audiosep_base | 15_1_29_2_2_2026_.wav | ? | 0.73 | 0.10 | Downloaded build failed: `NameError: os is not defined` in `open_clip/model.py` |
 | 2026-02-03 | mps | worker/frozen | audiosep_base | harmonica_audiosep.wav | ? | 0.48 | 0.09 | Local frozen build, use_chunk=true |
 | 2026-02-03 | mps | worker/frozen | audiosep_base | 1_28_46_1_31_2026_.wav | ? | 0.84 | 0.51 | Local frozen build, use_chunk=true |
+
+### Windows CUDA (RTX 3070 Laptop GPU)
+
+Worker: `audiosep_worker.py` (venv_cuda)  
+Mode: `use_torch_stft=auto`, `auto_stft_seconds=60`, `use_chunk=false`  
+Inputs (size-based): `22_9_4_1_28_2026_.wav`, `17_24_54_1_27_2026_.wav`, `0_52_50_1_29_2026_.wav`
+
+| Variant | Total (s) | Per-job (s) | Notes |
+|---------|-----------|-------------|-------|
+| Spawn-per-job | 45.60 | 2.37, 2.40, 3.29 | Load model each run |
+| Persistent worker | 17.02 | 2.45, 0.10, 1.01 | Single long-lived process |
 
 ## Optimization Tests (Runtime Env, pre-freeze)
 

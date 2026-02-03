@@ -10,7 +10,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = SCRIPT_DIR
 
 APP_NAME = "DSU-Audiosep"
-APP_VERSION = "1.0.2"
+APP_VERSION = "1.0.3"
 
 OUTPUT_DIR = os.path.join(PROJECT_ROOT, "dist", "dsu-audiosep")
 if os.path.exists(OUTPUT_DIR):

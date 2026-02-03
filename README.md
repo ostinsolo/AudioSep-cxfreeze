@@ -113,6 +113,8 @@ printf '%s\n' \
 
 This compares spawning a worker per job vs a single long-lived worker.
 
+Latest Windows CUDA results are recorded in `BENCHMARKS.md`.
+
 ```bash
 python benchmark_worker_persistence.py \
   --config /abs/path/config/audiosep_base.yaml \
