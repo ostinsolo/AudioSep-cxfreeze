@@ -1,13 +1,20 @@
 # Runtime / build
 .venv/
+.venv*/
 venv/
 runtime/
+runtime*/
 runtime-intel/
 dist/
 *.pyc
 __pycache__/
 *.egg-info/
 .eggs/
+test_output/
+
+# uv
+.uv/
+uv.lock
 
 # IDE / OS
 .idea/
@@ -15,6 +22,6 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
-# Large / optional (do not commit full checkpoints if large)
-# checkpoint/*.ckpt
-# roberta-base/
+# Large / optional (do not commit full checkpoints/models)
+checkpoint/
+roberta-base/
