@@ -4,6 +4,7 @@ import os
 import sys
 import time
 import traceback
+import soundfile as sf
 
 # Fix for PyTorch inspect issues in frozen builds
 if getattr(sys, "frozen", False):
@@ -197,6 +198,19 @@ def send_json(obj):
     sys.stdout.flush()
 
 
+def _parse_use_torch_stft(value):
+    if isinstance(value, str) and value.lower() == "auto":
+        return "auto", False
+    return "force", bool(value)
+
+
+def _get_audio_duration_seconds(path):
+    info = sf.info(path)
+    if info.samplerate <= 0:
+        return 0.0
+    return info.frames / info.samplerate
+
+
 def worker_mode():
     def _parse_max_cached_models(argv):
         if "--max-cached-models" in argv:
@@ -221,6 +235,12 @@ def worker_mode():
     device = None
     config_path = None
     checkpoint_path = None
+    clap_checkpoint_path = None
+    roberta_dir = None
+    mmap_load = False
+    use_torch_stft_mode = "force"
+    use_torch_stft_value = False
+    auto_stft_seconds = 60.0
     base_dir = os.path.dirname(sys.executable) if getattr(sys, "frozen", False) else os.path.dirname(__file__)
     os.environ["AUDIOSEP_BASE_DIR"] = base_dir
     os.environ["TRANSFORMERS_OFFLINE"] = "1"
@@ -236,6 +256,40 @@ def worker_mode():
         device = torch.device("cpu")
 
     send_json({"status": "ready", "device": str(device)})
+
+    def _load_model_with_flag(use_flag):
+        os.environ["AUDIOSEP_USE_TORCH_STFT"] = "1" if use_flag else "0"
+        cache_key = (
+            os.path.abspath(config_path),
+            os.path.abspath(checkpoint_path),
+            os.path.abspath(clap_checkpoint_path) if clap_checkpoint_path else "",
+            os.path.abspath(roberta_dir) if roberta_dir else "",
+            str(device),
+            bool(use_flag),
+            bool(mmap_load),
+        )
+        if cache_key in model_cache:
+            cached_model = model_cache[cache_key]
+            if cache_key in cache_order:
+                cache_order.remove(cache_key)
+            cache_order.append(cache_key)
+            return cached_model, 0.0, True
+
+        t0 = time.time()
+        loaded_model = build_audiosep(
+            config_yaml=config_path,
+            checkpoint_path=checkpoint_path,
+            device=device,
+            mmap=mmap_load,
+        )
+        elapsed = round(time.time() - t0, 2)
+        if max_cached_models > 0:
+            model_cache[cache_key] = loaded_model
+            cache_order.append(cache_key)
+            while len(cache_order) > max_cached_models:
+                evict_key = cache_order.pop(0)
+                model_cache.pop(evict_key, None)
+        return loaded_model, elapsed, False
 
     while True:
         line = sys.stdin.readline()
@@ -264,6 +318,9 @@ def worker_mode():
                 "model_loaded": model is not None,
                 "checkpoint_path": checkpoint_path,
                 "config_path": config_path,
+                "use_torch_stft_mode": use_torch_stft_mode,
+                "use_torch_stft_value": use_torch_stft_value,
+                "auto_stft_seconds": auto_stft_seconds,
             })
             continue
 
@@ -273,7 +330,12 @@ def worker_mode():
             clap_checkpoint_path = job.get("clap_checkpoint_path")
             roberta_dir = job.get("roberta_dir")
             device_str = job.get("device")
-            use_torch_stft = bool(job.get("use_torch_stft", False))
+            use_torch_stft_mode, use_torch_stft_value = _parse_use_torch_stft(job.get("use_torch_stft", False))
+            if use_torch_stft_mode == "auto":
+                try:
+                    auto_stft_seconds = float(job.get("auto_stft_seconds", 60.0))
+                except (TypeError, ValueError):
+                    auto_stft_seconds = 60.0
             mmap_load = bool(job.get("mmap", False))
             if device_str:
                 device = torch.device(device_str)
@@ -297,7 +359,7 @@ def worker_mode():
                 os.environ["AUDIOSEP_CLAP_CKPT"] = clap_checkpoint_path
             if roberta_dir:
                 os.environ["AUDIOSEP_ROBERTA_DIR"] = roberta_dir
-            os.environ["AUDIOSEP_USE_TORCH_STFT"] = "1" if use_torch_stft else "0"
+            os.environ["AUDIOSEP_USE_TORCH_STFT"] = "1" if use_torch_stft_value else "0"
             os.environ["AUDIOSEP_MMAP_LOAD"] = "1" if mmap_load else "0"
 
             if not os.path.exists(config_path):
@@ -313,50 +375,8 @@ def worker_mode():
                 send_json({"status": "error", "message": f"RoBERTa dir not found: {roberta_dir}"})
                 continue
 
-            cache_key = (
-                os.path.abspath(config_path),
-                os.path.abspath(checkpoint_path),
-                os.path.abspath(clap_checkpoint_path) if clap_checkpoint_path else "",
-                os.path.abspath(roberta_dir) if roberta_dir else "",
-                str(device),
-                bool(use_torch_stft),
-                bool(mmap_load),
-            )
-
-            if cache_key in model_cache:
-                model = model_cache[cache_key]
-                if cache_key in cache_order:
-                    cache_order.remove(cache_key)
-                cache_order.append(cache_key)
-                send_json({
-                    "status": "model_loaded",
-                    "elapsed": 0.0,
-                    "checkpoint_path": checkpoint_path,
-                    "clap_checkpoint_path": clap_checkpoint_path,
-                    "roberta_dir": roberta_dir,
-                    "config_path": config_path,
-                    "device": str(device),
-                    "cached": True,
-                    "cache_size": len(model_cache),
-                    "max_cached_models": max_cached_models,
-                })
-                continue
-
             try:
-                t0 = time.time()
-                model = build_audiosep(
-                    config_yaml=config_path,
-                    checkpoint_path=checkpoint_path,
-                    device=device,
-                    mmap=mmap_load,
-                )
-                elapsed = round(time.time() - t0, 2)
-                if max_cached_models > 0:
-                    model_cache[cache_key] = model
-                    cache_order.append(cache_key)
-                    while len(cache_order) > max_cached_models:
-                        evict_key = cache_order.pop(0)
-                        model_cache.pop(evict_key, None)
+                model, elapsed, cached = _load_model_with_flag(use_torch_stft_value)
                 send_json({
                     "status": "model_loaded",
                     "elapsed": elapsed,
@@ -365,9 +385,12 @@ def worker_mode():
                     "roberta_dir": roberta_dir,
                     "config_path": config_path,
                     "device": str(device),
-                    "cached": False,
+                    "cached": cached,
                     "cache_size": len(model_cache),
                     "max_cached_models": max_cached_models,
+                    "use_torch_stft_mode": use_torch_stft_mode,
+                    "use_torch_stft_value": use_torch_stft_value,
+                    "auto_stft_seconds": auto_stft_seconds,
                 })
             except Exception as e:
                 send_json({
@@ -395,6 +418,13 @@ def worker_mode():
                 continue
 
             try:
+                if use_torch_stft_mode == "auto":
+                    duration = _get_audio_duration_seconds(input_path)
+                    desired_flag = duration >= auto_stft_seconds
+                    if desired_flag != use_torch_stft_value:
+                        use_torch_stft_value = desired_flag
+                        model, _, _ = _load_model_with_flag(use_torch_stft_value)
+
                 t0 = time.time()
                 separate_audio(
                     model=model,
@@ -409,6 +439,8 @@ def worker_mode():
                     "status": "done",
                     "elapsed": elapsed,
                     "files": [output_path],
+                    "use_torch_stft_mode": use_torch_stft_mode,
+                    "use_torch_stft_value": use_torch_stft_value,
                 })
             except Exception as e:
                 send_json({

@@ -86,6 +86,27 @@ Mode: `use_chunk=false`
 Cache test (`--max-cached-models 2`):
 - First `load_model`: 2.82s (cached=false)
 - Second `load_model`: 0.00s (cached=true)
+
+### Long file (1–2 min) MPS STFT check
+
+Input: `1_28_46_1_31_2026_.wav` (vocals), `use_chunk=false`
+
+| Variant | Model Load (s) | Long (s) | Notes |
+|---------|----------------|----------|-------|
+| Baseline (torchlibrosa) | 2.71 | 0.55 | |
+| MPS STFT | 2.32 | 0.53 | `torch.istft` resize warning |
+
+### Long files (≈1–3 min) MPS STFT check
+
+Inputs:  
+- `18_0_43_1_30_2026_.wav` (~78s)  
+- `17_55_20_1_30_2026_.wav` (~160s)  
+Query: `vocals`, `use_chunk=false`
+
+| Variant | Model Load (s) | 78s (s) | 160s (s) | Notes |
+|---------|----------------|---------|----------|-------|
+| Baseline (torchlibrosa) | 2.83 | 2.16 | 11.24 | |
+| MPS STFT | 3.08 | 1.54 | 3.52 | `torch.istft` resize warning |
 |      | cpu    | worker/frozen | audiosep_base | test_4s.wav | 4s |  |  |  |
 |      | cuda   | worker/frozen | audiosep_base | test_4s.wav | 4s |  |  |  |
 

@@ -49,7 +49,8 @@ Send one JSON command per line via stdin. Responses are JSON on stdout.
   "clap_checkpoint_path": "/abs/path/checkpoint/music_speech_audioset_epoch_15_esc_89.98.pt",
   "roberta_dir": "/abs/path/roberta-base",
   "mmap": false,
-  "use_torch_stft": false
+  "use_torch_stft": "auto",
+  "auto_stft_seconds": 60
 }
 ```
 
@@ -72,7 +73,8 @@ Send one JSON command per line via stdin. Responses are JSON on stdout.
 - `clap_checkpoint_path` (load_model): CLAP checkpoint.
 - `roberta_dir` (load_model): Local RoBERTa directory.
 - `mmap` (load_model): `true` enables `torch.load(..., mmap=True)` when supported (faster load on SSD).
-- `use_torch_stft` (load_model): `true` uses native `torch.stft/torch.istft` (MPS path in PyTorch 2.10).
+- `use_torch_stft` (load_model): `true` uses native `torch.stft/torch.istft` (MPS path in PyTorch 2.10). Use `"auto"` to switch based on input duration.
+- `auto_stft_seconds` (load_model): Threshold (seconds) for `"auto"` mode. Default `60`.
 - `input` (separate): Input WAV path.
 - `output` (separate): Output WAV path.
 - `text` (separate): Query text (e.g. `"harmonica"`, `"vocals"`).
