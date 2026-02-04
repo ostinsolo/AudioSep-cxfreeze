@@ -22,37 +22,57 @@ def build_audiosep(config_yaml, checkpoint_path, device, mmap=False):
     print(f'Loaded AudioSep model from [{checkpoint_path}]')
     return model
 
+SR = 32000
+
+
+def _run_separation(model, mixture_mono, conditions, device, use_chunk):
+    """Run separation on a single mono channel. Returns (samples,) float32."""
+    input_dict = {
+        "mixture": torch.Tensor(mixture_mono)[None, None, :].to(device),
+        "condition": conditions,
+    }
+    if use_chunk:
+        window = (1.0 + 3.0 + 1.0) * SR
+        if input_dict["mixture"].shape[2] <= window * 2:
+            sep = model.ss_model(input_dict)["waveform"]
+            sep = sep.squeeze(0).squeeze(0).data.cpu().numpy()
+        else:
+            sep = model.ss_model.chunk_inference(input_dict)
+            sep = np.squeeze(sep)
+    else:
+        sep = model.ss_model(input_dict)["waveform"]
+        sep = sep.squeeze(0).squeeze(0).data.cpu().numpy()
+    return sep
+
+
 def separate_audio(model, audio_file, text, output_file, device='cuda', use_chunk=False):
     print(f'Separating audio from [{audio_file}] with textual query: [{text}]')
-    mixture, fs = librosa.load(audio_file, sr=32000, mono=True)
-    with torch.no_grad():
-        text = [text]
+    # Load preserving channels: stereo (2, N) or mono (N,)
+    mixture, fs = librosa.load(audio_file, sr=SR, mono=False)
+    if mixture.ndim == 1:
+        mixture = mixture[np.newaxis, :]  # (1, N)
 
+    with torch.no_grad():
+        text_list = [text]
         conditions = model.query_encoder.get_query_embed(
             modality='text',
-            text=text,
+            text=text_list,
             device=device
         )
 
-        input_dict = {
-            "mixture": torch.Tensor(mixture)[None, None, :].to(device),
-            "condition": conditions,
-        } 
+        # Process each channel separately for real stereo (L and R get independent separation)
+        sep_channels = []
+        for ch in range(mixture.shape[0]):
+            sep_ch = _run_separation(model, mixture[ch], conditions, device, use_chunk)
+            sep_channels.append(sep_ch)
 
-        if use_chunk:
-            # Avoid chunk artifacts on short clips: fall back to full pass
-            window = (1.0 + 3.0 + 1.0) * 32000  # NL + NC + NR at 32 kHz
-            if input_dict["mixture"].shape[2] <= window * 2:
-                sep_segment = model.ss_model(input_dict)["waveform"]
-                sep_segment = sep_segment.squeeze(0).squeeze(0).data.cpu().numpy()
-            else:
-                sep_segment = model.ss_model.chunk_inference(input_dict)
-                sep_segment = np.squeeze(sep_segment)
-        else:
-            sep_segment = model.ss_model(input_dict)["waveform"]
-            sep_segment = sep_segment.squeeze(0).squeeze(0).data.cpu().numpy()
+        # Stack to stereo (N, 2) or mono input -> duplicate to (N, 2)
+        sep_stereo = np.stack(sep_channels, axis=1)
+        if sep_stereo.shape[1] == 1:
+            sep_stereo = np.repeat(sep_stereo, 2, axis=1)
 
-        write(output_file, 32000, np.round(sep_segment * 32767).astype(np.int16))
+        out_int16 = np.round(sep_stereo * 32767).astype(np.int16)
+        write(output_file, SR, out_int16)
         print(f'Separated audio written to [{output_file}]')
 
 if __name__ == '__main__':

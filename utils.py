@@ -372,6 +372,8 @@ def load_ss_model(
         condition_size=condition_size,
     )
 
+    # mmap: Lightning's load_from_checkpoint passes **kwargs to __init__, which doesn't accept mmap.
+    # Use env AUDIOSEP_MMAP_LOAD for CLAP; for main checkpoint we pass map_location only.
     pl_model = AudioSep.load_from_checkpoint(
         checkpoint_path=checkpoint_path,
         strict=False,
@@ -383,7 +385,6 @@ def load_ss_model(
         learning_rate=None,
         lr_lambda_func=None,
         map_location=torch.device('cpu'),
-        mmap=mmap,
     )
 
     return pl_model
