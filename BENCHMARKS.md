@@ -104,6 +104,15 @@ Mode: `use_torch_stft=true`, `use_chunk=false`, `device=cuda`
 - Cold: 32.16s (pip venv) / 115.87s (uv venv)
 - Warm: **OOM** on RTX 3070 Laptop (8 GB)
 
+#### CUDA STFT (auto chunk fix, long file)
+
+Input: `0_52_50_1_29_2026_.wav` (~43.11s)  
+Mode: `use_torch_stft=true`, `use_chunk="auto"`, `chunk_seconds=30`, `device=cuda`
+
+| Variant | Cold (s) | Warm (s) | Notes |
+|---------|----------|----------|-------|
+| Auto chunk | 3.52 | 1.15 | Avoided OOM on RTX 3070 Laptop |
+
 ## Optimization Tests (Runtime Env, pre-freeze)
 
 Environment: `test_audiosep/runtime` (PyTorch 2.10, MPS)  
