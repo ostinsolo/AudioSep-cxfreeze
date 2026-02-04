@@ -86,6 +86,24 @@ Inputs (size-based): `22_9_4_1_28_2026_.wav`, `17_24_54_1_27_2026_.wav`, `0_52_5
 | Spawn-per-job | 45.60 | 2.37, 2.40, 3.29 | Load model each run |
 | Persistent worker | 17.02 | 2.45, 0.10, 1.01 | Single long-lived process |
 
+#### CUDA STFT (small file, cold vs warm)
+
+Input: `22_9_4_1_28_2026_.wav` (~0.98s)  
+Mode: `use_torch_stft=true`, `use_chunk=false`, `device=cuda`
+
+| Env | Cold (s) | Warm (s) | Notes |
+|-----|----------|----------|-------|
+| pip venv (`venv_cuda`) | 6.78 | 0.06 | `expandable_segments` unsupported |
+| uv venv (`venv_uv_cuda`) | 7.10 | 0.06 | `expandable_segments` unsupported |
+
+#### CUDA STFT (large file, warm OOM)
+
+Input: `0_52_50_1_29_2026_.wav` (~43.11s)  
+Mode: `use_torch_stft=true`, `use_chunk=false`, `device=cuda`
+
+- Cold: 32.16s (pip venv) / 115.87s (uv venv)
+- Warm: **OOM** on RTX 3070 Laptop (8 GB)
+
 ## Optimization Tests (Runtime Env, pre-freeze)
 
 Environment: `test_audiosep/runtime` (PyTorch 2.10, MPS)  
