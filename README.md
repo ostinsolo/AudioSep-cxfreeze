@@ -142,6 +142,10 @@ These paths must exist in the repo root:
 - `requirements-inference-*.txt`
 - `.github/workflows/release.yml`
 
+## TODO
+
+- [ ] Implement seeds in the AudioSep source code (for reproducible separation).
+
 ## Attribution
 
 AudioSep is from the original authors and repository. This repo packages it into a frozen runtime.

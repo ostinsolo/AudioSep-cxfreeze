@@ -3,6 +3,94 @@
 This file tracks **AudioSep-only** benchmarks for the standalone runtime in this repo.
 It is independent from the parent DSU benchmarks.
 
+## 🏆 Benchmark Summary
+
+┌──────────────────────────────────────────────────────────────┐
+│ 🎧 AudioSep Benchmarks — Snapshot                            │
+├──────────────────────────────────────────────────────────────┤
+│ 🧠 Load cost dominates cold starts (CLAP + model + imports).  │
+│ ⚡ Warm runs are fast when cache hits are used.              │
+│ 🔥 CUDA STFT on long files can OOM without chunking.         │
+│ 🧩 Auto chunking fixes CUDA OOM on long files.               │
+│ 🧪 UV vs pip inference speed is effectively the same.        │
+└──────────────────────────────────────────────────────────────┘
+
+### Quick Highlights
+
+- 🧊 **Cold vs warm:** cold time is mostly model load; warm is much faster.
+- 🚀 **CUDA:** best gains after warm-up; long files need chunking.
+- 🧩 **Auto chunk:** avoids OOM on long CUDA STFT runs.
+- 🧪 **UV vs pip:** install speed differs, runtime speed is similar.
+
+### 🏅 Winning Methods (so far)
+
+- 🥇 **Windows CUDA long file (43s), STFT true + auto chunk:** cold 3.52s, warm 1.15s
+- 🥈 **Windows CUDA small file (0.98s), STFT true:** warm 0.06s (pip or uv)
+- 🥉 **MPS runtime env, baseline + mmap:** lower load time than baseline (2.40s vs 2.79s)
+
+### 📊 Architecture Overview (best known config)
+
+| Arch | Best Mode | Key Settings | Status |
+|------|-----------|--------------|--------|
+| Windows CUDA | STFT true + auto chunk | `use_torch_stft=true`, `use_chunk="auto"`, `chunk_seconds=30` | ✅ Stable |
+| macOS MPS | STFT auto + mmap | `use_torch_stft=auto`, `mmap=true`, `use_chunk=false` | ✅ Stable |
+| Intel (CPU) | TBD | TBD | ⏳ Placeholder |
+
+### 🧱 Cold / Warm Timing Matrix (by arch)
+
+| Arch | Mode | File | pip cold (s) | pip warm (s) | uv cold (s) | uv warm (s) | Notes |
+|------|------|------|--------------|--------------|-------------|-------------|-------|
+| Windows CUDA | STFT true + auto chunk | `0_52_50_1_29_2026_.wav` (~43s) | **3.52** | **1.15** | — | — | Stable, no OOM (pip only so far) |
+| Windows CUDA | STFT true | `22_9_4_1_28_2026_.wav` (~0.98s) | 6.78 | 0.06 | 7.10 | 0.06 | Small-file STFT |
+| macOS MPS | worker/frozen | `15_1_29_2_2_2026_.wav` | 0.45 | 0.10 | — | — | Local frozen build, use_chunk=true |
+| macOS MPS | worker/frozen | `harmonica_audiosep.wav` | 0.48 | 0.09 | — | — | Local frozen build, use_chunk=true |
+| macOS MPS | worker/frozen | `1_28_46_1_31_2026_.wav` | 0.84 | 0.51 | — | — | Local frozen build, use_chunk=true |
+| Intel (CPU) | TBD | TBD | TBD | TBD | TBD | TBD | Placeholder |
+
+### ⚡ Speedups (Δ / ×)
+
+| Scenario | From → To | Speedup |
+|----------|-----------|---------|
+| CUDA long file (43s) | no chunk → auto chunk (cold) | **~x9.1** (32.16s → 3.52s) |
+| CUDA long file (43s) | cold → warm (auto chunk) | **~x3.1** (3.52s → 1.15s) |
+| CUDA small file (0.98s) | cold → warm (pip) | **~x113** (6.78s → 0.06s) |
+| CUDA small file (0.98s) | cold → warm (uv) | **~x118** (7.10s → 0.06s) |
+| MPS load | baseline → mmap (load) | **~x1.16** (2.79s → 2.40s) |
+| MPS long (78s) | baseline → MPS STFT | **~x1.4** (2.16s → 1.54s) |
+| MPS long (160s) | baseline → MPS STFT | **~x3.2** (11.24s → 3.52s) |
+| MPS persistence | spawn → persistent | **~x1.6** (12.04s → 7.47s) |
+
+### 📏 Real‑time Factor (audio sec / processing sec)
+
+Computed from entries with known audio duration only.
+
+| Scenario | Duration | Time | RTF (x real‑time) |
+|----------|----------|------|------------------|
+| CUDA long, STFT true (pip, cold) | ~43.11s | 32.16s | **~1.34x** |
+| CUDA long, STFT true (uv, cold) | ~43.11s | 115.87s | **~0.37x** |
+| CUDA long, STFT true + auto chunk (cold) | ~43.11s | 3.52s | **~12.25x** |
+| CUDA long, STFT true + auto chunk (warm) | ~43.11s | 1.15s | **~37.49x** |
+| CUDA small, STFT true (pip, cold) | ~0.98s | 6.78s | **~0.14x** |
+| CUDA small, STFT true (pip, warm) | ~0.98s | 0.06s | **~16.33x** |
+| CUDA small, STFT true (uv, cold) | ~0.98s | 7.10s | **~0.14x** |
+| CUDA small, STFT true (uv, warm) | ~0.98s | 0.06s | **~16.33x** |
+
+### 📈 Quick Charts (lower is better)
+
+Cold/Warm (CUDA, long file ~43s, STFT true + auto chunk)
+
+```
+Cold  ████████████ 3.52s
+Warm  ████         1.15s
+```
+
+Persistent vs Spawn (CUDA, 3 inputs)
+
+```
+Spawn   ████████████████████████████████████████ 45.60s
+Persist ███████████                              17.02s
+```
+
 ## Test Inputs
 
 Use consistent audio files for repeatable timing:
