@@ -262,6 +262,7 @@ def worker_mode():
     policy_max_cached = _get_policy_value(policy, "audiosep", "max_cached_models")
     policy_use_torch_stft = _get_policy_value(policy, "audiosep", "use_torch_stft")
     policy_auto_stft = _get_policy_value(policy, "audiosep", "auto_stft_seconds")
+    policy_chunk_seconds = _get_policy_value(policy, "audiosep", "chunk_seconds")
     policy_mmap = _get_policy_value(policy, "audiosep", "mmap")
 
     model = None
@@ -277,6 +278,7 @@ def worker_mode():
     use_torch_stft_mode = "force"
     use_torch_stft_value = False
     auto_stft_seconds = 60.0
+    chunk_seconds = 30.0
     base_dir = os.path.dirname(sys.executable) if getattr(sys, "frozen", False) else os.path.dirname(__file__)
     os.environ["AUDIOSEP_BASE_DIR"] = base_dir
     os.environ["TRANSFORMERS_OFFLINE"] = "1"
@@ -387,6 +389,18 @@ def worker_mode():
                         auto_stft_seconds = 60.0
                 else:
                     auto_stft_seconds = 60.0
+            if "chunk_seconds" in job:
+                try:
+                    chunk_seconds = float(job.get("chunk_seconds"))
+                except (TypeError, ValueError):
+                    chunk_seconds = 30.0
+            elif policy_chunk_seconds is not None:
+                try:
+                    chunk_seconds = float(policy_chunk_seconds)
+                except (TypeError, ValueError):
+                    chunk_seconds = 30.0
+            else:
+                chunk_seconds = 30.0
             if "mmap" in job:
                 mmap_load = bool(job.get("mmap"))
             elif policy_mmap is not None:
@@ -464,7 +478,7 @@ def worker_mode():
             input_path = job.get("input")
             output_path = job.get("output")
             text = job.get("text", "speech")
-            use_chunk = bool(job.get("use_chunk", False))
+            use_chunk = job.get("use_chunk", False)
 
             if not input_path or not os.path.exists(input_path):
                 send_json({"status": "error", "message": f"Input not found: {input_path}"})
@@ -480,6 +494,11 @@ def worker_mode():
                     if desired_flag != use_torch_stft_value:
                         use_torch_stft_value = desired_flag
                         model, _, _ = _load_model_with_flag(use_torch_stft_value)
+                if isinstance(use_chunk, str) and use_chunk.lower() == "auto":
+                    duration = _get_audio_duration_seconds(input_path)
+                    use_chunk = duration >= chunk_seconds
+                else:
+                    use_chunk = bool(use_chunk)
 
                 t0 = time.time()
                 separate_audio(

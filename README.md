@@ -78,7 +78,7 @@ Send one JSON command per line via stdin. Responses are JSON on stdout.
 - `input` (separate): Input WAV path.
 - `output` (separate): Output WAV path.
 - `text` (separate): Query text (e.g. `"harmonica"`, `"vocals"`).
-- `use_chunk` (separate): `true` uses chunked inference (faster on long audio, can add artifacts on short clips). `false` uses full pass (best quality on short clips).
+- `use_chunk` (separate): `true` uses chunked inference (faster on long audio, can add artifacts on short clips). `false` uses full pass (best quality on short clips). `"auto"` enables duration-based chunking (see `audiosep.chunk_seconds`).
 
 ### Worker flags
 
@@ -97,6 +97,7 @@ AudioSep keys (optional):
 - `audiosep.use_torch_stft` (`true`, `false`, or `"auto"`)
 - `audiosep.auto_stft_seconds`
 - `audiosep.mmap`
+- `audiosep.chunk_seconds` (default 30)
 
 ### Example
 
