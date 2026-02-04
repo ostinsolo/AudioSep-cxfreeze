@@ -25,3 +25,6 @@ Thumbs.db
 # Large / optional (do not commit full checkpoints/models)
 checkpoint/
 roberta-base/
+
+# Benchmark / test output
+cmds*.jsonl

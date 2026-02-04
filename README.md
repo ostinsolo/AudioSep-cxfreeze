@@ -23,6 +23,16 @@ python build_dsu_audiosep.py
 Output: `dist/dsu-audiosep/`  
 Runtime scripts: `build_runtime_mac_mps.sh`, `build_runtime_mac_intel.sh`
 
+### macOS Intel (manual build, reused across releases)
+
+GitHub Actions macos runners are ARM. The release workflow **copies the Intel build from the previous release** into each new release. To update it:
+
+1. On an Intel Mac (or via SSH): `./build_runtime_mac_intel.sh` then `python build_dsu_audiosep.py`
+2. Create `audiosep-mac-intel.tar.gz`: `tar -czf audiosep-mac-intel.tar.gz -C dist dsu-audiosep`
+3. Upload to the **current** release on GitHub (replaces the copied one)
+
+Until you do that, each new release includes the Intel build from the prior release.
+
 ## Models
 
 Model files are **not** committed. See `MODEL_DOWNLOADS.md` for URLs and download notes.

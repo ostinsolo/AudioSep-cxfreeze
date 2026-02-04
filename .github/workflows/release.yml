@@ -167,7 +167,7 @@ jobs:
           path: audiosep-mac-arm.tar.gz
 
   # =============================================================================
-  # Release
+  # Release (Intel: copied from previous release until you manually replace)
   # =============================================================================
   release:
     name: Create Release
@@ -180,6 +180,34 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: ./artifacts
+
+      - name: Fetch Intel build from previous release
+        id: intel
+        run: |
+          # Copy Intel from latest release (previous to this one) until you manually replace with newer build
+          RELEASES=$(curl -sH "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/releases")
+          INTEL_URL=$(echo "$RELEASES" | jq -r '((.[0] // {}).assets // [])[] | select(.name=="audiosep-mac-intel.tar.gz") | .browser_download_url // empty')
+          if [ -n "$INTEL_URL" ]; then
+            mkdir -p ./artifacts/audiosep-mac-intel
+            curl -sL -o ./artifacts/audiosep-mac-intel/audiosep-mac-intel.tar.gz "$INTEL_URL"
+            echo "Included Intel build from previous release"
+          else
+            echo "No Intel asset in previous release (upload manually when ready)"
+          fi
+
+      - name: Prepare release files list
+        id: files
+        run: |
+          {
+            echo "./artifacts/audiosep-win-cuda/audiosep-win-cuda.7z"
+            echo "./artifacts/audiosep-win-cpu/audiosep-win-cpu.zip"
+            echo "./artifacts/audiosep-mac-arm/audiosep-mac-arm.tar.gz"
+            [ -f ./artifacts/audiosep-mac-intel/audiosep-mac-intel.tar.gz ] && echo "./artifacts/audiosep-mac-intel/audiosep-mac-intel.tar.gz"
+          } > files.txt
+          echo "list<<EOF" >> $GITHUB_OUTPUT
+          cat files.txt >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Determine version
         id: version
@@ -209,7 +237,7 @@ jobs:
             | **Windows CUDA** | `audiosep-win-cuda.7z` | NVIDIA CUDA 12.6 |
             | **Windows CPU** | `audiosep-win-cpu.zip` | None |
             | **macOS ARM** | `audiosep-mac-arm.tar.gz` | MPS (Metal) |
-            | **macOS Intel** | (manual build) | CPU |
+            | **macOS Intel** | `audiosep-mac-intel.tar.gz` | CPU (from previous release until replaced manually) |
             
             ### Usage (worker mode)
             
@@ -221,9 +249,6 @@ jobs:
             ```
             
             See [MODEL_DOWNLOADS.md](MODEL_DOWNLOADS.md) for checkpoint URLs.
-          files: |
-            ./artifacts/audiosep-win-cuda/audiosep-win-cuda.7z
-            ./artifacts/audiosep-win-cpu/audiosep-win-cpu.zip
-            ./artifacts/audiosep-mac-arm/audiosep-mac-arm.tar.gz
+          files: ${{ steps.files.outputs.list }}
           draft: false
           prerelease: false
