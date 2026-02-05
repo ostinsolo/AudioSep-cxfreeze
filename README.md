@@ -5,6 +5,17 @@ Repo: `github.com/ostinsolo/AudioSep-cxfreeze`
 
 This repo is **not** the upstream project. It packages AudioSep into a minimal, inference-only worker + shared runtime.
 
+## Documentation
+
+- **[AUDIOSEP_DOCUMENTATION.md](AUDIOSEP_DOCUMENTATION.md)** — Architecture, prompt-to-operation flow, stereo/44.1 kHz improvements
+- **[AUDIOSEP_TODO.md](AUDIOSEP_TODO.md)** — Professional verification checklist (evidence-based)
+
+## Improvements over upstream
+
+- **Stereo output:** Per-channel processing (L and R separated independently); mono input duplicated to L=R
+- **44.1 kHz output:** Resampled from model rate (32 kHz) for DAW compatibility
+- **mmap fix:** Correct `load_from_checkpoint` usage for frozen builds
+
 ## Releases
 
 - Tag `v*` or run the **Release AudioSep cx_Freeze** workflow to create a release.
@@ -151,6 +162,14 @@ These paths must exist in the repo root:
 - `config/`
 - `requirements-inference-*.txt`
 - `.github/workflows/release.yml`
+
+## Regression test
+
+```bash
+python verify_output_format.py --input /path/to/input.wav --models /path/to/models
+```
+
+Checks output is stereo, 44.1 kHz, and duration matches input.
 
 ## TODO
 

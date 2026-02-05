@@ -22,7 +22,8 @@ def build_audiosep(config_yaml, checkpoint_path, device, mmap=False):
     print(f'Loaded AudioSep model from [{checkpoint_path}]')
     return model
 
-SR = 32000
+SR = 32000  # Model native rate
+OUT_SR = 44100  # Output sample rate (match typical DAW/project rate)
 
 
 def _run_separation(model, mixture_mono, conditions, device, use_chunk):
@@ -71,8 +72,14 @@ def separate_audio(model, audio_file, text, output_file, device='cuda', use_chun
         if sep_stereo.shape[1] == 1:
             sep_stereo = np.repeat(sep_stereo, 2, axis=1)
 
+        # Resample from model rate (32 kHz) to output rate (44.1 kHz)
+        if OUT_SR != SR:
+            sep_stereo = librosa.resample(
+                sep_stereo.T, orig_sr=SR, target_sr=OUT_SR, res_type="polyphase"
+            ).T
+
         out_int16 = np.round(sep_stereo * 32767).astype(np.int16)
-        write(output_file, SR, out_int16)
+        write(output_file, OUT_SR, out_int16)
         print(f'Separated audio written to [{output_file}]')
 
 if __name__ == '__main__':
