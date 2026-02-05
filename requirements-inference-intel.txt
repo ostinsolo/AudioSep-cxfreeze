@@ -1,6 +1,7 @@
 # Inference-only dependencies for DSU-Audiosep (Mac Intel x86_64 / CPU)
 # Python: 3.10
 # Note: PyTorch 2.3+ not available for Intel Mac; use 2.2.2
+# Pin librosa/llvmlite/numba to versions with pre-built wheels (avoids llvmlite C++ compilation)
 
 torch==2.2.2
 torchaudio==2.2.2
@@ -8,7 +9,9 @@ torchvision==0.17.2
 numpy<2
 scipy
 soundfile>=0.12
-librosa>=0.10
+librosa==0.10.1
+llvmlite==0.41.1
+numba==0.58.1
 pyyaml
 torchlibrosa==0.1.0
 transformers==4.30.2

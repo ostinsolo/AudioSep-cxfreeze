@@ -2,6 +2,7 @@
 .venv/
 .venv*/
 venv/
+venv_uv_cuda/
 runtime/
 runtime*/
 runtime-intel/
@@ -28,3 +29,9 @@ roberta-base/
 
 # Benchmark / test output
 cmds*.jsonl
+
+# Release artifacts (upload to GitHub Releases, do not commit)
+audiosep-mac-intel.tar.gz
+audiosep-mac-arm.tar.gz
+audiosep-win-*.7z
+audiosep-win-*.zip

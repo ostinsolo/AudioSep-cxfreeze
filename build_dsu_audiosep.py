@@ -69,6 +69,7 @@ packages = [
 ]
 
 excludes = [
+    # AudioSep project-specific (training, colab, etc.)
     "models.CLAP.training",
     "data",
     "evaluation",
@@ -86,8 +87,24 @@ excludes = [
     "torchmetrics",
     "webdataset",
     "pandas",
-    "sklearn",
-    "scikit_learn",
+    # NOTE: sklearn is NOT excluded - required by librosa and CLAP loss.py
+    # Standard exclusions (reduce size, not needed at runtime)
+    "tkinter",
+    "test",
+    "tests",
+    "distutils",
+    "setuptools",
+    "pip",
+    "wheel",
+    "pydoc_data",
+    "curses",
+    "IPython",
+    "jupyter",
+    "notebook",
+    "matplotlib.backends.backend_qt5agg",
+    "PyQt5",
+    "PySide2",
+    "cx_Freeze",
 ]
 
 build_exe_options = {
@@ -113,6 +130,57 @@ executables = [
 if len(sys.argv) == 1:
     sys.argv.append("build_exe")
 
+
+def _post_build_cleanup(output_dir):
+    """Remove unnecessary files (tests, Cython sources, docs) to reduce size."""
+    lib_dir = os.path.join(output_dir, "lib")
+    total_removed = 0
+    if not os.path.isdir(lib_dir):
+        return
+    # 1. Remove test directories
+    for root, dirs, _ in os.walk(lib_dir, topdown=False):
+        for d in dirs:
+            if d in ("tests", "test"):
+                path = os.path.join(root, d)
+                if os.path.isdir(path):
+                    try:
+                        size = sum(
+                            os.path.getsize(os.path.join(r, f))
+                            for r, _, files in os.walk(path) for f in files
+                        )
+                        shutil.rmtree(path)
+                        total_removed += size
+                    except OSError:
+                        pass
+    # 2. Remove Cython/C source (.pyx, .pxd, .c, .h). Keep .pyi - librosa needs them
+    for root, dirs, files in os.walk(lib_dir, topdown=False):
+        for f in files:
+            if f.endswith((".pyx", ".pxd", ".c", ".h")):
+                path = os.path.join(root, f)
+                try:
+                    total_removed += os.path.getsize(path)
+                    os.remove(path)
+                except OSError:
+                    pass
+    # 3. Remove examples, doc, docs, include
+    for root, dirs, _ in os.walk(lib_dir, topdown=False):
+        for d in dirs:
+            if d in ("examples", "example", "doc", "docs", "include"):
+                path = os.path.join(root, d)
+                if os.path.isdir(path):
+                    try:
+                        size = sum(
+                            os.path.getsize(os.path.join(r, f))
+                            for r, _, files in os.walk(path) for f in files
+                        )
+                        shutil.rmtree(path)
+                        total_removed += size
+                    except OSError:
+                        pass
+    if total_removed > 0:
+        print(f"\nPost-build: Removed ~{total_removed / (1024*1024):.1f} MB (tests, .pyx/.c/.h, examples, doc, include)")
+
+
 setup(
     name=APP_NAME,
     version=APP_VERSION,
@@ -120,3 +188,6 @@ setup(
     options={"build_exe": build_exe_options},
     executables=executables,
 )
+
+# Post-build cleanup (runs after cx_Freeze completes)
+_post_build_cleanup(OUTPUT_DIR)

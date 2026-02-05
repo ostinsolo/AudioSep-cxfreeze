@@ -21,6 +21,7 @@ It is independent from the parent DSU benchmarks.
 - 🚀 **CUDA:** best gains after warm-up; long files need chunking.
 - 🧩 **Auto chunk:** avoids OOM on long CUDA STFT runs.
 - 🧪 **UV vs pip:** install speed differs, runtime speed is similar.
+- 🍎 **Intel vs MPS:** same inputs (test_4s.wav, test_40s.wav) for cross-arch comparison.
 
 ### 🏅 Winning Methods (so far)
 
@@ -34,7 +35,7 @@ It is independent from the parent DSU benchmarks.
 |------|-----------|--------------|--------|
 | Windows CUDA | STFT true + auto chunk | `use_torch_stft=true`, `use_chunk="auto"`, `chunk_seconds=30` | ✅ Stable |
 | macOS MPS | STFT auto + mmap | `use_torch_stft=auto`, `mmap=true`, `use_chunk=false` | ✅ Stable |
-| Intel (CPU) | TBD | TBD | ⏳ Placeholder |
+| Intel (CPU) | STFT auto + chunk | `use_torch_stft=auto`, `use_chunk=true`, CPU-only | ✅ Stable |
 
 ### 🧱 Cold / Warm Timing Matrix (by arch)
 
@@ -45,7 +46,8 @@ It is independent from the parent DSU benchmarks.
 | macOS MPS | worker/frozen | `15_1_29_2_2_2026_.wav` | 0.45 | 0.10 | — | — | Local frozen build, use_chunk=true |
 | macOS MPS | worker/frozen | `harmonica_audiosep.wav` | 0.48 | 0.09 | — | — | Local frozen build, use_chunk=true |
 | macOS MPS | worker/frozen | `1_28_46_1_31_2026_.wav` | 0.84 | 0.51 | — | — | Local frozen build, use_chunk=true |
-| Intel (CPU) | TBD | TBD | TBD | TBD | TBD | TBD | Placeholder |
+| Intel (CPU) | worker/frozen | `test_4s.wav` (4s) | 2.83 | 0.49 | — | — | Frozen build, use_chunk=true |
+| Intel (CPU) | worker/frozen | `test_40s.wav` (40s) | 12.98 | 8.75 | — | — | Frozen build, use_chunk=true |
 
 ### ⚡ Speedups (Δ / ×)
 
@@ -59,6 +61,9 @@ It is independent from the parent DSU benchmarks.
 | MPS long (78s) | baseline → MPS STFT | **~x1.4** (2.16s → 1.54s) |
 | MPS long (160s) | baseline → MPS STFT | **~x3.2** (11.24s → 3.52s) |
 | MPS persistence | spawn → persistent | **~x1.6** (12.04s → 7.47s) |
+| Intel 4s | cold → warm | **~x5.8** (2.83s → 0.49s) |
+| Intel 40s | cold → warm | **~x1.5** (12.98s → 8.75s) |
+| Intel persistence | spawn → persistent | **~x1.5** (35.21s → 23.16s) |
 
 ### 📏 Real‑time Factor (audio sec / processing sec)
 
@@ -74,6 +79,10 @@ Computed from entries with known audio duration only.
 | CUDA small, STFT true (pip, warm) | ~0.98s | 0.06s | **~16.33x** |
 | CUDA small, STFT true (uv, cold) | ~0.98s | 7.10s | **~0.14x** |
 | CUDA small, STFT true (uv, warm) | ~0.98s | 0.06s | **~16.33x** |
+| Intel 4s (cold) | 4.0s | 2.83s | **~1.41x** |
+| Intel 4s (warm) | 4.0s | 0.49s | **~8.16x** |
+| Intel 40s (cold) | 40.0s | 12.98s | **~3.08x** |
+| Intel 40s (warm) | 40.0s | 8.75s | **~4.57x** |
 
 ### 📈 Quick Charts (lower is better)
 
@@ -89,6 +98,20 @@ Persistent vs Spawn (CUDA, 3 inputs)
 ```
 Spawn   ████████████████████████████████████████ 45.60s
 Persist ███████████                              17.02s
+```
+
+Cold/Warm (Intel CPU, 4s file, use_chunk=true)
+
+```
+Cold  █████████████████████████████ 2.83s
+Warm  █████                          0.49s
+```
+
+Persistent vs Spawn (Intel CPU, 4s + 40s)
+
+```
+Spawn   ███████████████████████████████████ 35.21s
+Persist ████████████████████████            23.16s
 ```
 
 ## Test Inputs
@@ -162,6 +185,21 @@ Record results in seconds. Include device, model, and file duration.
 | 2026-02-03 | mps | worker/frozen | audiosep_base | 15_1_29_2_2_2026_.wav | ? | 0.73 | 0.10 | Downloaded build failed: `NameError: os is not defined` in `open_clip/model.py` |
 | 2026-02-03 | mps | worker/frozen | audiosep_base | harmonica_audiosep.wav | ? | 0.48 | 0.09 | Local frozen build, use_chunk=true |
 | 2026-02-03 | mps | worker/frozen | audiosep_base | 1_28_46_1_31_2026_.wav | ? | 0.84 | 0.51 | Local frozen build, use_chunk=true |
+| 2026-02-05 | intel (CPU) | worker/frozen | audiosep_base | test_4s.wav | 4.0s | 2.83 | 0.49 | Frozen build, use_chunk=true |
+| 2026-02-05 | intel (CPU) | worker/frozen | audiosep_base | test_40s.wav | 40.0s | 12.98 | 8.75 | Frozen build, use_chunk=true |
+
+### Intel Mac (CPU-only, x86_64)
+
+Worker: `./dist/dsu-audiosep/dsu-audiosep --worker` (frozen)  
+Mode: `use_torch_stft=auto`, `auto_stft_seconds=60`, `use_chunk=true`  
+Inputs: `test_4s.wav` (4s), `test_40s.wav` (40s) — same as MPS for comparison
+
+| Variant | Total (s) | Per-job (s) | Notes |
+|---------|-----------|-------------|-------|
+| Spawn-per-job | 35.21 | 2.77, 11.67 | Load model each run |
+| Persistent worker | 23.16 | 2.61, 9.65 | Single long-lived process |
+
+Model load: ~7–8s (cold). Warm inference: 4s file ~0.5s, 40s file ~8.75s.
 
 ### Windows CUDA (RTX 3070 Laptop GPU)
 
@@ -263,8 +301,6 @@ Persistent sequence (short → long → short → long):
 - Startup 1.24s, load 2.65s
 - Per-job: 0.44s, 3.07s, 2.24s, 3.05s
 - Total: 12.69s
-|      | cpu    | worker/frozen | audiosep_base | test_4s.wav | 4s |  |  |  |
-|      | cuda   | worker/frozen | audiosep_base | test_4s.wav | 4s |  |  |  |
 
 ## MPS Optimizations (Ideas to Evaluate)
 

@@ -38,11 +38,14 @@ Runtime scripts: `build_runtime_mac_mps.sh`, `build_runtime_mac_intel.sh`
 
 GitHub Actions macos runners are ARM. The release workflow **copies the Intel build from the previous release** into each new release. To update it:
 
-1. On an Intel Mac (or via SSH): `./build_runtime_mac_intel.sh` then `python build_dsu_audiosep.py`
+1. On an Intel Mac (or via SSH): `bash build_runtime_mac_intel.sh` then `source runtime-intel/bin/activate && python build_dsu_audiosep.py`  
+   Or one-step: `bash build_runtime_mac_intel.sh freeze`
 2. Create `audiosep-mac-intel.tar.gz`: `tar -czf audiosep-mac-intel.tar.gz -C dist dsu-audiosep`
 3. Upload to the **current** release on GitHub (replaces the copied one)
 
 Until you do that, each new release includes the Intel build from the prior release.
+
+**Note:** Intel build uses Python 3.10 and pins `librosa==0.10.1`, `llvmlite==0.41.1`, `numba==0.58.1` with pre-built wheels to avoid llvmlite C++ compilation failures on Intel Mac.
 
 ## Models
 
